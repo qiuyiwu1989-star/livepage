@@ -10,3 +10,10 @@ private/
 uploads/
 *.db
 *.sqlite*
+
+workbench/data/
+workbench/workspace/
+workbench/imports/
+workbench/assets/
+workbench/atomdump/
+workbench/title-governance/
