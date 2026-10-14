@@ -4,6 +4,8 @@
 - [ ] 源转换试跑：12页v7已取消文字截图，原字体/TTC解析+显式替代；0061临时编辑浏览器验证，MiMo语义分组复核中；1920量化、结构可编辑与回库适配仍待完成。参见 docs/SOURCE-SCENE-PILOT.md。
 - [ ] 处理状态页面真实浏览器与私有数据验收；当前仅本地代码及合成测试完成。
 
+- [ ] Deck/编辑交接（004）：12页实验包及版本固定deck已生成；OpenDesign Docs地址待确认，真实导入/保存/回库未接通。
+
 ## Next
 - [ ] HTML管线整改：按 specs/003-html-pipeline-repair.md 从P0来源基线、P1验收闸开始，首张0001。
 - [ ] 核验 DeepSeek harness 任务协议和 MiMo 2.6 Flash 实际模型 ID，对账外部任务。
