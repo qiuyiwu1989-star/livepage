@@ -66,7 +66,7 @@ footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-fa
 </head>
 <body>
 <div class="wrap">
-  <div class="eyebrow">活页 LivePage</div><nav class="course-shortcuts" aria-label="工作区"><a href="index.html">活页库</a><a href="../assembly.html">我的备课</a><a href="../library.html?processing=1">导入与处理</a><a href="../mcp-access.html">MCP 接入</a></nav>
+  <div class="eyebrow">活页 LivePage</div><nav class="course-shortcuts" aria-label="工作区"><a href="index.html">活页库</a><a href="../assembly.html">我的备课</a><a href="../library.html?processing=1">导入与处理</a><a href="/admin/mcp/">MCP 中心</a></nav>
   <div class="library-heading"><h1>活页库</h1><a class="prep-entry" href="../assembly.html">备课工作区 →</a></div>
   <p class="lead">按熟悉的课程找内容，再把需要的页面加入备课。</p>
 
