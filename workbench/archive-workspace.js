@@ -1,5 +1,6 @@
 function arrowIcon(direction){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(direction==='next'?'M9 5l7 7-7 7':'M15 5l-7 7 7 7')+'"/></svg>';}
 let readyPlayback;const playbackReady=new Promise(resolve=>{readyPlayback=resolve;});
+async function readerJSON(url){const key='livepage-reader:'+url;try{const cache=JSON.parse(sessionStorage.getItem(key)||'null');if(cache&&Date.now()-cache.time<300000)return cache.data;}catch{}const r=await fetch(url);if(!r.ok)throw Error('读取失败');const data=await r.json();try{sessionStorage.setItem(key,JSON.stringify({time:Date.now(),data}));}catch{}return data;}
 async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok)throw Error('删除状态读取失败');return new Set((await r.json()).deleted);}
 (async()=>{const id=document.body.dataset.atomId;const host=document.querySelector('.sidecard');if(!host)return;const b=document.createElement('button');b.className='btn block';b.textContent='删除原子页';host.append(b);const msg=document.createElement('p');msg.setAttribute('role','status');host.append(msg);const gone=await removalState();function paint(){const deleted=gone.has(id);b.textContent=deleted?'恢复原子页':'删除原子页';document.body.classList.toggle('atom-deleted',deleted);if(deleted)msg.textContent='已删除：本原子及各课程出现位置已从浏览与检索中移除。可在这里恢复。';}paint();b.onclick=async()=>{const deleted=gone.has(id);if(!deleted&&!confirm('删除这个原子页及它在各课件中的出现位置？已有课件历史保留，删除后可恢复。'))return;b.disabled=true;try{const r=await fetch('/api/atoms/'+encodeURIComponent(id)+'/removal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:deleted?'restore':'delete'})});if(!r.ok)throw Error('操作失败，请重试');location.reload();}catch(e){msg.textContent=e.message;b.disabled=false;}};})();
 'use strict';
@@ -9,7 +10,7 @@ async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok
   const atomId = document.body.dataset.atomId;
   if (!button || !atomId) return;
   try {
-    const response = await fetch('/api/atoms/' + encodeURIComponent(atomId));
+    const response = await fetch('/api/atoms/' + encodeURIComponent(atomId)+'?view=reader');
     if (!response.ok) throw Error('备课关联暂不可用，请刷新重试。');
     const data = await response.json();
     const preferred = new URLSearchParams(location.search).get('slide') || data.structured_archive?.rep;
@@ -90,12 +91,9 @@ async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok
 
 (async function deckContext() {
   try {
-    const response = await fetch('deck-context.json');
-    if (!response.ok) throw Error('课件顺序暂不可用');
-    const removed=await removalState();
-    const rows = (await response.json()).filter(r=>!removed.has(r.atom_id));
-    const titleResponse=await fetch('../title-governance/knowledge-title-overlay.json');
-    const titles=titleResponse.ok?(await titleResponse.json()).titles||{}:{};
+    const [directory,removed,titleData]=await Promise.all([readerJSON('deck-context.json'),removalState(),readerJSON('../title-governance/knowledge-title-overlay.json').catch(()=>({titles:{}}))]);
+    const rows=directory.filter(r=>!removed.has(r.atom_id));
+    const titles=titleData.titles||{};
     for(const row of rows){const t=titles[row.atom_id];if(t?.knowledge_title){row.original_title=row.title;row.title=t.knowledge_title;row.title_candidate=t.human_review!=='confirmed';}}
     document.querySelectorAll(".reccard,.relcard").forEach(a=>{const id=a.getAttribute("href").split(".")[0];if(removed.has(id))a.remove();});
     const atom = document.body.dataset.atomId;
@@ -108,8 +106,8 @@ async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok
     const index = siblings.findIndex(r=>r.id===current.id);
     const href = row => row.atom_id + '.html?slide=' + encodeURIComponent(row.id);
     const hero = document.querySelector('#hero-img');
-    if(requested) hero.src = '/uploads/slides-hd/' + current.id + '.jpg';
-    hero.dataset.hd = hero.src;
+    if(requested){const hd='/uploads/slides-hd/'+current.id+'.jpg';hero.src='/uploads/slides/'+current.id+'.jpg';hero.dataset.hd=hd;const decoded=new Image();decoded.onload=()=>{if(hero.dataset.hd===hd)hero.src=hd;};decoded.src=hd;}
+    // Preserve the HTML's HD target while its progressive image is still decoding.
     hero.alt = current.title;
     document.querySelector('.stagetools > div:last-child').textContent = current.id + ' · ' + current.deck_name;
     document.querySelector('.pagenav .mid').textContent = current.deck_name + ' · 第 ' + current.page + ' 页';

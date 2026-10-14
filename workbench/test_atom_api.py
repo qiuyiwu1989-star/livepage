@@ -16,6 +16,7 @@ class AtomAPI(unittest.TestCase):
     library_api.register_library(app,root);c=app.test_client();r=c.get('/api/atoms?q=隐性经验').json
     self.assertEqual(r['total'],1);self.assertEqual(r['atoms'][0]['occurrence_count'],2)
     d=c.get('/api/atoms/old-temp').json;self.assertEqual(d['canonical_id'],'atom-original');self.assertEqual(d['atom'],atom);self.assertEqual(len(d['pages']),2);self.assertEqual(len(d['interpretation_endpoints']),2)
+    reader=c.get('/api/atoms/old-temp?view=reader').json;self.assertEqual(reader['canonical_id'],'atom-original');self.assertEqual(len(reader['pages']),2);self.assertNotIn('atom',reader);self.assertNotIn('annotation',reader['pages'][0])
     self.assertEqual(c.get('/api/atoms/missing').status_code,404);self.assertEqual(c.get('/api/atoms?limit=bad').status_code,400)
     self.assertEqual(c.get('/api/library/page/p1').json['navigation']['next'],'p2')
 

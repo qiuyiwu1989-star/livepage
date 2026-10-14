@@ -209,6 +209,10 @@ def register_library(app, root=None):
   if not atom:return jsonify(error='原子页不存在'),404
   occurrences=[o for o in data['occurrences'] if o['atom_id']==canonical]
   ids={o['occurrence_id'] for o in occurrences}
+  if request.args.get('view')=='reader':
+   archive=archive_records().get(canonical) or {}
+   pages=[{'page_id':p['page_id'],'legacy_ids':p.get('legacy_ids',[]),'html':{k:p.get('html',{}).get(k) for k in ['status','url']}} for p in load()['pages'] if p['page_id'] in ids]
+   return jsonify(canonical_id=canonical,structured_archive={'rep':archive.get('rep')},pages=pages)
   effective=view(next((p for p in load()['pages'] if p['page_id'] in ids),{'atomic_id':canonical,'annotation':atom.get('annotation',{})})).get('annotation',{}).get('vlm_summary',{})
   return jsonify(title_overlay=title_overlay(canonical),atom=atom,requested_id=atom_id,canonical_id=canonical,structured_archive=archive_records().get(canonical),original_atom_detail=originals()[0].get(canonical),effective_vlm_annotation=effective,framework_links=originals()[1].get('by_atom',{}).get(canonical,{}),framework_provenance=originals()[1].get('_meta',{}),
     occurrences=occurrences,pages=[view(p) for p in load()['pages'] if p['page_id'] in ids],
