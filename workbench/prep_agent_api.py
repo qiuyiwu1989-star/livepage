@@ -90,11 +90,16 @@ def register_prep_agent(app, root):
         duration = intent.get('duration_minutes')
         if duration is not None and (type(duration) not in (int, float) or not 1 <= duration <= 1440):
             return jsonify(error='授课时长须为 1 至 1440 分钟'), 400
+        min_pages, max_pages = intent.get('min_pages'), intent.get('max_pages')
+        if any(v is not None and (type(v) is not int or not 1 <= v <= 3000) for v in (min_pages,max_pages)) or (min_pages is not None and max_pages is not None and min_pages > max_pages):
+            return jsonify(error='页数范围须为 1 至 3000 的整数，且下限不超过上限'),400
         catalog_dir = Path(app.config.get('ASSEMBLY_CATALOG_DIR', root.parent / 'slide-library-migration/generated'))
         catalog = json.loads((catalog_dir / 'catalog.json').read_text())
         audit_path = root / 'qa/white-image-audit.json'
         audit = json.loads(audit_path.read_text()) if audit_path.exists() else {}
-        bad = set(audit.get('white_images', [])) | set(audit.get('black_images', []))
+        health_path=root/'atom-pages/image-health.json'
+        health=json.loads(health_path.read_text()) if health_path.exists() else {}
+        bad = set(audit.get('white_images', [])) | set(audit.get('black_images', [])) | set(health.get('white',[])) | set(health.get('black',[])) | set(health.get('missing',[]))
         removed = deleted_ids(root)
         candidates = []
         for page in catalog['pages']:
@@ -134,11 +139,8 @@ def register_prep_agent(app, root):
         proposal = {k: result.get(k) for k in ('title', 'chapters', 'issues')}
         proposal['total_minutes']=sum(e['minutes'] for c in proposal['chapters'] for e in c['entries'])
         proposal['requested_duration_minutes']=duration
-        if duration and proposal['total_minutes']>duration:
-            issues=proposal.get('issues')
-            if not isinstance(issues,list):issues=[]
-            issues.append({'type':'duration_mismatch','description':f'按逐页时长计算为{proposal["total_minutes"]}分钟，超过目标{duration}分钟；请调整选页或时长。'})
-            proposal['issues']=issues
+        if (duration and proposal['total_minutes']>duration) or (min_pages is not None and len(page_ids)<min_pages) or (max_pages is not None and len(page_ids)>max_pages):
+            return jsonify(error='模型方案超出目标时长或页数范围，当前课件未改动，请重新生成',code='proposal_limits_exceeded',total_minutes=proposal['total_minutes'],page_count=len(page_ids)),422
         proposal.update(proposal_id='proposal-' + uuid.uuid4().hex, status='pending', assembly_id=aid, base_revision=revision, page_ids=page_ids, model=model, generated_at=datetime.now(timezone.utc).isoformat(), source='real_model', excluded_image_count=len(bad))
         store.mkdir(parents=True, exist_ok=True)
         target = store / (proposal['proposal_id'] + '.json')

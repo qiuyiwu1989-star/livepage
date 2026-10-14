@@ -18,3 +18,13 @@ class Tests(unittest.TestCase):
   self.app.config['PREP_AGENT_PROVIDER']=lambda c:self.result('fake');self.assertEqual(self.client.post('/api/prep/proposals',json=self.body()).status_code,502)
  def test_stale(self):
   self.app.config['PREP_AGENT_PROVIDER']=lambda c:self.result();b=self.body();b['base_revision']=0;self.assertEqual(self.client.post('/api/prep/proposals',json=b).status_code,409)
+
+ def test_duration_limit_rejects_without_saving(self):
+  self.app.config['PREP_AGENT_PROVIDER']=lambda c:self.result();b=self.body();b['intent']['duration_minutes']=4
+  r=self.client.post('/api/prep/proposals',json=b);self.assertEqual(r.status_code,422);self.assertFalse((self.r/'data/prep-proposals').exists());self.assertEqual(len(list((self.r/'data/assemblies'/self.a).glob('*.json'))),1)
+ def test_exact_duration_is_valid(self):
+  self.app.config['PREP_AGENT_PROVIDER']=lambda c:self.result();b=self.body();b['intent']['duration_minutes']=5;self.assertEqual(self.client.post('/api/prep/proposals',json=b).status_code,201)
+ def test_page_count_lower_bound(self):
+  self.app.config['PREP_AGENT_PROVIDER']=lambda c:self.result();b=self.body();b['intent']['min_pages']=2;b['intent']['max_pages']=3;self.assertEqual(self.client.post('/api/prep/proposals',json=b).status_code,422)
+ def test_invalid_page_range(self):
+  self.app.config['PREP_AGENT_PROVIDER']=lambda c:self.result();b=self.body();b['intent'].update(min_pages=3,max_pages=2);self.assertEqual(self.client.post('/api/prep/proposals',json=b).status_code,400)
