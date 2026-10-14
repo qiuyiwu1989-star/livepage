@@ -11,7 +11,7 @@ ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
 
 def font_payload(path,text):
-    font=TTFont(path);cmap=font.getBestCmap();points=set(map(ord,text));missing=points-set(cmap)
+    font=TTFont(path[0],fontNumber=path[1]) if isinstance(path,tuple) else TTFont(path);cmap=font.getBestCmap();points=set(map(ord,text));missing=points-set(cmap)
     # Whitespace may have no glyph; all actual visible characters must be covered.
     missing={x for x in missing if not chr(x).isspace()}
     if missing:raise ValueError('Font missing codepoints: '+str(sorted(missing)))
@@ -64,7 +64,9 @@ def preserve_text_regions(scene, pdf, indices, reason):
     scene['limitations'].append('Some text regions retain source raster; not editable')
 
 
-def render_scene(scene,font_resolver):
+def render_scene(scene,font_resolver,*,allow_source_raster=False):
+    if not allow_source_raster and any(b.get("source_raster") for b in scene["text"]):
+        raise ValueError("Raster text is a visual reference, not an editable candidate")
     fonts={};groups={}
     for b in scene['text']:
         if b.get('source_raster'):continue
@@ -84,6 +86,6 @@ def render_scene(scene,font_resolver):
             blocks.append(f'<img data-block="{i}" data-editable="false" title="Source text region; editing pending" alt="{html.escape(b["text"],quote=True)}" style="position:absolute;left:{cq(x0)};top:{cq(y0)};width:{cq(x1-x0)};height:{cq(y1-y0)}" src="data:image/png;base64,{r["png"]}">')
             continue
         family,baseline=fonts[b['font']];x,y=b['origin'];size=b['size']
-        blocks.append(f'<span class="text" data-block="{i}" style="left:{cq(x)};top:{cq(y-baseline*size)};font-family:{family};font-size:{cq(size)};color:#{b["color"]:06x}">{html.escape(b["text"])}</span>')
+        blocks.append(f'<span class="text" contenteditable="true" spellcheck="false" data-block="{i}" style="left:{cq(x)};top:{cq(y-baseline*size)};font-family:{family};font-size:{cq(size)};color:#{b["color"]:06x}">{html.escape(b["text"])}</span>')
     svg=scene['graphics_svg'];svg=re.sub(r'<(?:ns\d+:)?svg\b',lambda m:m[0]+' class="graphics"',svg,count=1)
     return '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>'+''.join(css)+f'html,body{{margin:0;background:#ddd}}.slide{{position:relative;width:100vw;aspect-ratio:{w}/{h};container-type:inline-size;overflow:hidden}}.graphics{{position:absolute;width:100%;height:100%;inset:0}}.text{{position:absolute;white-space:pre;line-height:1;font-synthesis:none}}</style><article class="slide">'+svg+''.join(blocks)+'</article></html>'
