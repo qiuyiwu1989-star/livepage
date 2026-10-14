@@ -94,6 +94,8 @@ footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-fa
 
   <div class="grid" id="grid"></div>
   <button id="load-more" type="button" style="display:block;margin:24px auto;padding:10px 24px;border:1px solid var(--line);border-radius:24px;background:var(--card);color:var(--ink);font:inherit;cursor:pointer" hidden>加载更多</button>
+  <div id="load-sentinel" aria-hidden="true" style="height:1px"></div>
+  <p id="load-progress" role="status" aria-live="polite" style="text-align:center;color:var(--ink3);font-size:13px"></p>
   <div class="empty-note" id="nores" hidden>没有匹配的知识单元</div>
 
   <footer>
@@ -150,6 +152,13 @@ const moreButton=document.getElementById('load-more');
 function loadThumbnail(img){if(img.dataset.srcset)img.srcset=img.dataset.srcset;img.src=img.dataset.src;img.removeAttribute('data-src');img.removeAttribute('data-srcset');}
 const thumbnailObserver=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{for(const item of entries){if(item.isIntersecting){loadThumbnail(item.target);thumbnailObserver.unobserve(item.target);}}},{rootMargin:'200px 0px'}):null;
 function observeThumbnails(){grid.querySelectorAll('img[data-src]').forEach(img=>{if(thumbnailObserver)thumbnailObserver.observe(img);else loadThumbnail(img);});}
+const sentinel=document.getElementById('load-sentinel');
+const loadProgress=document.getElementById('load-progress');
+let batchFrame=null;
+function scheduleBatch(){if(batchFrame!==null||shown>=filtered.length)return;batchFrame=requestAnimationFrame(()=>{batchFrame=null;appendMore();});}
+const batchObserver=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))scheduleBatch();},{rootMargin:'400px 0px'}):null;
+if(batchObserver)batchObserver.observe(sentinel);
+else window.addEventListener('scroll',onScroll,{passive:true});
 moreButton.onclick=()=>appendMore();
 
 function appendMore(){
@@ -157,7 +166,10 @@ function appendMore(){
   const next=filtered.slice(shown,shown+PAGE_SIZE).map(card).join('');
   grid.insertAdjacentHTML('beforeend',next);
   shown=Math.min(shown+PAGE_SIZE,filtered.length);
-  observeThumbnails();moreButton.hidden=shown>=filtered.length;moreButton.textContent='加载更多 · 已显示 '+shown+' / '+filtered.length;
+  observeThumbnails();moreButton.hidden=!!batchObserver||shown>=filtered.length;moreButton.textContent='加载更多 · 已显示 '+shown+' / '+filtered.length;
+  loadProgress.textContent=shown<filtered.length?'已显示 '+shown+' / '+filtered.length+' · 下滑自动加载':(filtered.length?'已显示全部 '+shown+' 项':'');
+  // If a batch does not fill the viewport, continue one batch per frame.
+  if(batchObserver){batchObserver.unobserve(sentinel);if(shown<filtered.length)batchObserver.observe(sentinel);}
 }
 function render(){
   const term=(q.value||'').toLowerCase().trim();
@@ -178,6 +190,7 @@ function render(){
     if(!term) return true;
     return (a.title+' '+(a.topic||'')+' '+(a.section||'')+' '+(a.frame||'')+' '+a.atom_id).toLowerCase().indexOf(term)>=0;
   });
+  if(batchFrame!==null){cancelAnimationFrame(batchFrame);batchFrame=null;}
   thumbnailObserver?.disconnect();grid.innerHTML=''; shown=0;
   appendMore();
   cnt.textContent=filtered.length+' / '+(window.coursePages||DATA).length+(window.coursePages?' 页':' 项内容');
@@ -194,7 +207,7 @@ function onScroll(){
     if(rect.bottom < window.innerHeight*2) appendMore();
   });
 }
-// Paging is intentional: only the explicit load-more action creates the next batch.
+// Append bounded batches near the viewport; thumbnail loading remains independent.
 q.addEventListener('input',render); ff.addEventListener('change',render); st.addEventListener('change',render);htmlFilter.addEventListener('change',()=>{const url=new URL(location.href);if(htmlFilter.value)url.searchParams.set('html',htmlFilter.value);else url.searchParams.delete('html');history.replaceState(null,'',url);render();});
 fetch('/api/atom-removals').then(r=>r.json()).then(d=>{window.removedAtoms=new Set(d.deleted);render();}).catch(()=>{});
 fetch('image-health.json').then(r=>r.json()).then(d=>{window.imageHealth=d;render();}).catch(()=>{});

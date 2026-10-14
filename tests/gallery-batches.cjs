@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const text=fs.readFileSync('workbench/build_index.py','utf8');
+const start=text.indexOf('const PAGE_SIZE=24;'),end=text.indexOf('function render(){',start);
+const nodes=new Map(),observers=[],frames=[];
+const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,textContent:''});return nodes.get(id)};
+const ctx={document:{getElementById:get},window:{addEventListener(){}},grid:{querySelectorAll(){return []},insertAdjacentHTML(){}},card:()=>'<article/>',onScroll(){},requestAnimationFrame:f=>(frames.push(f),frames.length),IntersectionObserver:class{constructor(fn){this.fn=fn;observers.push(this)}observe(){}unobserve(){}},console};
+vm.createContext(ctx);vm.runInContext(text.slice(start,end),ctx);
+vm.runInContext('filtered=Array.from({length:55},()=>({}));appendMore()',ctx);
+assert.equal(vm.runInContext('shown',ctx),24);
+const batch=observers[1];batch.fn([{isIntersecting:true}]);batch.fn([{isIntersecting:true}]);assert.equal(frames.length,1,'coalesce duplicate visibility callbacks');frames.shift()();assert.equal(vm.runInContext('shown',ctx),48);
+batch.fn([{isIntersecting:true}]);frames.shift()();assert.equal(vm.runInContext('shown',ctx),55);assert.equal(get('load-progress').textContent,'已显示全部 55 项');assert.equal(get('load-more').hidden,true);batch.fn([{isIntersecting:true}]);assert.equal(frames.length,0,'stop at end');console.log('Gallery bounded auto batches and completion passed');
