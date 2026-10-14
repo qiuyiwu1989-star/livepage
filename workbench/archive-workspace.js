@@ -1,7 +1,8 @@
 function arrowIcon(direction){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(direction==='next'?'M9 5l7 7-7 7':'M15 5l-7 7 7 7')+'"/></svg>';}
 let readyPlayback;const playbackReady=new Promise(resolve=>{readyPlayback=resolve;});
-async function readerJSON(url){const key='livepage-reader:'+url;try{const cache=JSON.parse(sessionStorage.getItem(key)||'null');if(cache&&Date.now()-cache.time<300000)return cache.data;}catch{}const r=await fetch(url);if(!r.ok)throw Error('读取失败');const data=await r.json();try{sessionStorage.setItem(key,JSON.stringify({time:Date.now(),data}));}catch{}return data;}
-async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok)throw Error('删除状态读取失败');return new Set((await r.json()).deleted);}
+async function readerFetch(url,options={}){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);try{return await fetch(url,{...options,signal:controller.signal});}finally{clearTimeout(timer);}}
+async function readerJSON(url){const key='livepage-reader:'+url;try{const cache=JSON.parse(sessionStorage.getItem(key)||'null');if(cache&&Date.now()-cache.time<300000)return cache.data;}catch{}const r=await readerFetch(url);if(!r.ok)throw Error('读取失败');const data=await r.json();try{sessionStorage.setItem(key,JSON.stringify({time:Date.now(),data}));}catch{}return data;}
+async function removalState(){const r=await readerFetch('/api/atom-removals');if(!r.ok)throw Error('删除状态读取失败');return new Set((await r.json()).deleted);}
 (async()=>{const id=document.body.dataset.atomId;const host=document.querySelector('.sidecard');if(!host)return;const b=document.createElement('button');b.className='btn block';b.textContent='删除原子页';host.append(b);const msg=document.createElement('p');msg.setAttribute('role','status');host.append(msg);const gone=await removalState();function paint(){const deleted=gone.has(id);b.textContent=deleted?'恢复原子页':'删除原子页';document.body.classList.toggle('atom-deleted',deleted);if(deleted)msg.textContent='已删除：本原子及各课程出现位置已从浏览与检索中移除。可在这里恢复。';}paint();b.onclick=async()=>{const deleted=gone.has(id);if(!deleted&&!confirm('删除这个原子页及它在各课件中的出现位置？已有课件历史保留，删除后可恢复。'))return;b.disabled=true;try{const r=await fetch('/api/atoms/'+encodeURIComponent(id)+'/removal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:deleted?'restore':'delete'})});if(!r.ok)throw Error('操作失败，请重试');location.reload();}catch(e){msg.textContent=e.message;b.disabled=false;}};})();
 'use strict';
 (async function () {
@@ -10,7 +11,7 @@ async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok
   const atomId = document.body.dataset.atomId;
   if (!button || !atomId) return;
   try {
-    const response = await fetch('/api/atoms/' + encodeURIComponent(atomId)+'?view=reader');
+    const response = await readerFetch('/api/atoms/' + encodeURIComponent(atomId)+'?view=reader');
     if (!response.ok) throw Error('备课关联暂不可用，请刷新重试。');
     const data = await response.json();
     const preferred = new URLSearchParams(location.search).get('slide') || data.structured_archive?.rep;
@@ -85,8 +86,8 @@ async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok
     document.body.append(script);
   } catch (error) {
     button.textContent = '暂不能加入备课';
-    feedback.textContent = error.message;
-  }
+    feedback.textContent = error.name==='AbortError'?'连接超时，请刷新重试。':error.message;
+  } finally { readyPlayback(); }
 })();
 
 (async function deckContext() {
@@ -148,6 +149,7 @@ async function removalState(){const r=await fetch('/api/atom-removals');if(!r.ok
     const dock=document.createElement('div');dock.className='presentation-dock';host.append(dock);
     await playbackReady;
     const listButton=host.querySelector('.presentation-pages-button');const exitButton=host.querySelector('.presentation-exit');
+    if(!listButton||!exitButton)return;
     exitButton.textContent='↩';exitButton.setAttribute('aria-label','退出全屏');exitButton.title='退出全屏';
     dock.append(listButton,arrows,badge);
     const progress=document.createElement('span');progress.className='presentation-progress';progress.style.setProperty('--progress',((index+1)/siblings.length*100)+'%');dock.append(progress,exitButton);
