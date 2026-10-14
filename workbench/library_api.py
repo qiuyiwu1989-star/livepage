@@ -137,6 +137,14 @@ def register_library(app, root=None):
           'identity_status':atom.get('identity_status'),'summary':summary,
           'occurrence_count':len(atom.get('occurrence_ids',[])),
           'representative_page':page,'detail_url':'/api/atoms/'+atom['atom_id']}
+ @bp.get('/api/library/processing')
+ def processing_summary():
+  from processing_status import course_summary
+  data=load()
+  path=root/'data/processing-jobs.json'
+  jobs=json.loads(path.read_text()).get('pages',{}) if path.exists() else {}
+  return jsonify(courses=course_summary(data.get('decks',[]),data.get('pages',[]),jobs),
+                 task_registry_available=path.exists())
  @bp.get('/api/library')
  def catalog():
   data=load();pages=data.get('pages',[]);q=request.args.get('q','').strip().casefold();deck=request.args.get('deck','');stage=request.args.get('stage','');mode=request.args.get('mode','pages')
