@@ -1,3 +1,15 @@
+# 正式远程服务（2026-10-14）
+
+地址 https://qiuyiwu.com/mcp/livepage，Streamable HTTP，Authorization: Bearer <client-key>。服务端systemd livepage-mcp常驻，127.0.0.1:5398，经Nginx TLS代理。复用5298业务API。当前采用独立预签发密钥，不宣称OAuth自动登录兼容。
+
+密钥注册表仅存SHA256、课程范围、有效期、撤销状态；每请求重新读取。初始所有者密钥保存在服务器/opt/livepage/state/mcp/owner.key（0600，30天）；不分享所有者密钥，第三方逐客户端签发。管理工具manage_client.py --registry ... --client ... --deck ... --secret-file ...，--revoke单独撤销。当前签发默认启用素材下载；课程范围1-20项，期限1-90天。新课程不自动扩权。
+
+生产代码/隔离环境在/opt/livepage/state/mcp/service及venv；此目录保存代码是首次部署安排，后续应纳入版本化release发布。Nginx修改前备份在同目录nginx.before-mcp.conf。回滚：禁用新增/mcp/livepage代理并停止livepage-mcp服务，不影响原工作台。网页说明由workbench/mcp-access.html提供，仍须登录。
+
+实测9项本地测试通过；HTTPS真实协议初始化、list_tools=6、课程读取通过；未授权401。未改任何知识/组课数据。桌面客户端配置示例见首页接入说明；云端客户端必须支持自定义Authorization头。
+
+## 本地兼容方式
+
 # LivePage MCP · 第一阶段
 
 六个通用只读工具：livepage_search_content、livepage_list_collections、livepage_read_content、livepage_read_context、livepage_list_assets、livepage_get_asset。支持资料检索/写作/备课/剪辑，不绑定单个用途。
