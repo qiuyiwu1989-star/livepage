@@ -1,11 +1,10 @@
 """Read-only catalog bridge: migration snapshots stay separate from original stores."""
 from atom_removal import deleted_ids
 from pathlib import Path
-import os
 import json,copy
 from urllib.parse import urlsplit
 from flask import Blueprint,jsonify,request,send_from_directory
-MIGRATION=Path(os.environ.get('LIVEPAGE_CATALOG_ROOT',Path(__file__).resolve().parent.parent/'slide-library-migration'))
+MIGRATION=Path(__file__).resolve().parent.parent/'slide-library-migration'
 def register_library(app, root=None):
  root=Path(root) if root else Path(__file__).resolve().parent
  bp=Blueprint('unified_library',__name__);cache={'mtime':None,'data':None}
@@ -55,13 +54,13 @@ def register_library(app, root=None):
   if atomic_cache['mtime']!=stamp:
    data=json.loads(path.read_text())
    atomic_cache.update(mtime=stamp,data=data,occurrences={o['occurrence_id']:o for o in data['occurrences']},atoms={a['atom_id']:a for a in data['atoms']})
-  data=copy.deepcopy(atomic_cache['data']);gone=deleted_ids(root);data['atoms']=[a for a in data['atoms'] if a['atom_id'] not in gone];data['occurrences']=[o for o in data['occurrences'] if o['atom_id'] not in gone];return data
+  data=dict(atomic_cache['data']);gone=deleted_ids(root);data['atoms']=[a for a in data['atoms'] if a['atom_id'] not in gone];data['occurrences']=[o for o in data['occurrences'] if o['atom_id'] not in gone];return data
  def load():
   path=MIGRATION/'generated/catalog.json'
   if not path.exists():return {'decks':[],'pages':[],'status':'migration_pending'}
   stamp=path.stat().st_mtime_ns
   if cache['mtime']!=stamp:cache.update(mtime=stamp,data=json.loads(path.read_text()))
-  data=copy.deepcopy(cache['data']);gone=deleted_ids(root);data['pages']=[p for p in data['pages'] if p.get('atomic_id') not in gone];return data
+  data=dict(cache['data']);gone=deleted_ids(root);data['pages']=[p for p in data['pages'] if p.get('atomic_id') not in gone];return data
  def query(p):
   return json.dumps({'title_overlay':title_overlay(p.get('atomic_id')),'page':{k:p.get(k) for k in ['title','page_id','legacy_ids','atomic_id','atom_id','annotation']},'archive':archive_records().get(p.get('atomic_id')),'original_detail':originals()[0].get(p.get('atomic_id')),'frameworks':originals()[1].get('by_atom',{}).get(p.get('atomic_id'))},ensure_ascii=False).casefold()
  def has_html(p):return p.get('html',{}).get('status') in {'local_exists','unverified_remote'}
@@ -167,8 +166,8 @@ def register_library(app, root=None):
     searchable=json.dumps({'atom':atom,'archive':archive_records().get(atom['atom_id']),'standalone':source_records.get(atom['atom_id']),'frameworks':framework_data.get('by_atom',{}).get(atom['atom_id'])},ensure_ascii=False).casefold()
     page_text=' '.join(query(p)+' '+note_text.get(p['page_id'],'').casefold() for p in occurrences)
     if not all(term in searchable+' '+page_text for term in terms):continue
-   items.append(gallery_atom(atom,occurrences,source_records))
-  batch=items[offset:offset+limit]
+   items.append((atom,occurrences))
+  batch=[gallery_atom(atom,occurrences,source_records) for atom,occurrences in items[offset:offset+limit]]
   return jsonify(mode=mode,total=len(items),offset=offset,limit=limit,atoms=batch,pages=[a['representative_page'] for a in batch],decks=data.get('decks',[]),counts=counts,status=data.get('status','ready'))
  @bp.get('/api/library/page/<page_id>')
  def detail(page_id):

@@ -1,0 +1,15 @@
+[Unit]
+Description=LivePage unified workspace
+After=network.target
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/livepage/current/workspace
+ExecStart=/opt/livepage/venv/bin/gunicorn --workers 1 --threads 4 --timeout 90 --bind 127.0.0.1:5298 run_production:app
+Restart=on-failure
+RestartSec=10
+MemoryHigh=512M
+MemoryMax=1G
+CPUQuota=100%
+Nice=10
+[Install]
+WantedBy=multi-user.target
