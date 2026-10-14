@@ -14,3 +14,5 @@
 2026-10-14 已在宿主首次安装独立服务。现有个人站的纯静态 Actions 发布不能自动更新 /opt 下服务或 Nginx 配置；本仓库尚无自动服务发布工作流。后续需要统一发布脚本，而不是再复制一套产品。
 
 真实模型生产配置已接入并通过一次2页8分钟方案调用，模型产物仍待人工确认。尚未完成：OpenDesign 编辑往返协议、可编辑 HTML 全库验收，以及登录浏览器全流程视觉验收。
+
+生产写入来源通过 LIVEPAGE_WRITE_ORIGINS 配置（逗号分隔完整Origin），默认仅 https://qiuyiwu.com；本机工作台默认不放行公网来源。2026-10-14修复浏览器Origin与loopback Host不一致的误拒绝；备份位置 /opt/livepage/backups/origin-fix-20261014。

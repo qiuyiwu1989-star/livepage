@@ -42,6 +42,12 @@ class WorkspaceTest(unittest.TestCase):
   self.assertEqual(self.client.post('/api/collection',json={'pages':['p1','p1']}).json['collection'],['p1'])
   self.assertEqual(self.client.post('/api/collection',json={'pages':['missing']}).status_code,400)
   self.assertEqual(self.client.get('/api/workspace').json['collection'],['p1'])
+ def test_explicit_production_origin(self):
+  self.client.application.config['TRUSTED_WRITE_ORIGINS']=('https://qiuyiwu.com',)
+  for origin,expected in [('https://qiuyiwu.com',200),('http://qiuyiwu.com',403),('https://qiuyiwu.com.evil.test',403),('null',403)]:
+   self.assertEqual(self.client.post('/api/collection',json={'pages':['p1']},headers={'Origin':origin}).status_code,expected)
+ def test_forwarded_origin_cannot_bypass_guard(self):
+  self.assertEqual(self.client.post('/api/collection',json={'pages':['p1']},headers={'Origin':'https://evil.test','X-Forwarded-Host':'evil.test','X-Forwarded-Proto':'https'}).status_code,403)
  def test_cross_origin_rejected(self):
   self.assertEqual(self.client.post('/api/collection',json={'pages':['p1']},headers={'Origin':'https://example.com'}).status_code,403)
 if __name__=='__main__':unittest.main()

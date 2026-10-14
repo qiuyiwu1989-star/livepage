@@ -53,7 +53,7 @@ def create_app(root=ROOT):
  @app.before_request
  def local_only():
   if request.host.split(':')[0] not in ('127.0.0.1','localhost','[::1]'):return jsonify(error='仅允许本机访问'),403
-  if request.method!='GET' and request.headers.get('Origin') not in (None,request.host_url.rstrip('/')):return jsonify(error='跨来源写入被拒绝'),403
+  if request.method!='GET' and request.headers.get('Origin') not in (None,request.host_url.rstrip('/'),*app.config.get('TRUSTED_WRITE_ORIGINS',())):return jsonify(error='跨来源写入被拒绝'),403
  @app.after_request
  def headers(response):
   response.headers['X-Content-Type-Options']='nosniff'

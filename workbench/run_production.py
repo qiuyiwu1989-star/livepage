@@ -1,7 +1,10 @@
+import os
 from pathlib import Path
 from workspace_server import create_app
 from flask import request
 app=create_app(Path(__file__).parent)
+# Explicit public origins; never trust client-supplied forwarded headers.
+app.config['TRUSTED_WRITE_ORIGINS']=tuple(x.strip() for x in os.environ.get('LIVEPAGE_WRITE_ORIGINS','https://qiuyiwu.com').split(',') if x.strip())
 def urls(v):
  if isinstance(v,dict):return {k:urls(x) for k,x in v.items()}
  if isinstance(v,list):return [urls(x) for x in v]
