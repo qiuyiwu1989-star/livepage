@@ -33,3 +33,9 @@ catalog-root 下应有 generated/catalog.json；原子与治理视图另依赖 g
 build_index.py 生成新版库首页，需要既有私有索引、标题与预览清单；这些数据不随仓库发布。首批24张卡片，用户点击加载更多后才创建下一批。缩略图由 IntersectionObserver 在进入可视区附近时设置 src/srcset，首屏不下载全部图片；浏览器保留原比例和多尺寸选择。首屏内嵌的目录字段是元数据，不能称作已下载PPT原件。
 
 部署应保留云端现有标题、恢复图片和转换版本的合并结果，不用另一台电脑的旧索引直接覆盖。当前首次生产迁移使用了对应来源合并，后续生成流程仍需复用该对账步骤。
+
+## 详情传输与字体
+
+人用阅读器请求 /api/atoms/{id}?view=reader，使用页面身份和格式状态，不读取完整Agent档案。原完整接口保留证据字段。课程目录与候选标题并行读取，sessionStorage缓存5分钟，删除状态仍即时读取。
+
+prepare_reader_fonts.py（fonttools＋brotli）可从已授权原字体及可见字符码点JSON生成WOFF2子集。CSS中先保留原始完整字体，再追加相同family/weight的subset-fonts.css，按unicode-range选择子集，其他字继续回退完整字体。不得丢弃许可，也不得宣称字体子集等于完成HTML视觉验收。原字体和实际资源不附在代码仓库。
