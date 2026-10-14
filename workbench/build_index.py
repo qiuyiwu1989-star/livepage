@@ -66,7 +66,7 @@ footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-fa
 </head>
 <body>
 <div class="wrap">
-  <div class="eyebrow">活页 LivePage</div><nav class="course-shortcuts" aria-label="工作区"><a href="index.html">活页库</a><a href="../assembly.html">我的备课</a><a href="../library.html?processing=1">导入与处理</a><a href="/admin/mcp/">MCP 中心</a></nav>
+  <div class="eyebrow">活页 LivePage</div><nav class="course-shortcuts" aria-label="工作区"><a href="index.html">活页库</a><a href="../assembly.html">我的备课</a><a href="../processing.html">导入与处理</a><a href="/admin/mcp/">MCP 中心</a></nav>
   <div class="library-heading"><h1>活页库</h1><a class="prep-entry" href="../assembly.html">备课工作区 →</a></div>
   <p class="lead">按熟悉的课程找内容，再把需要的页面加入备课。</p>
 
@@ -98,11 +98,6 @@ footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-fa
   <div id="load-sentinel" aria-hidden="true" style="height:1px"></div>
   <p id="load-progress" role="status" aria-live="polite" style="text-align:center;color:var(--ink3);font-size:13px"></p>
   <div class="empty-note" id="nores" hidden>没有匹配的知识单元</div>
-
-  <footer>
-    数据：生产 slide-library（1443 去重原子）· 卡片用缩略图（懒加载）· 详情页用高清原图 · 未对外发布 · noindex<br>
-    每个卡片 = 一个独立生命周期档案页：①身份 ②表达 ③证据 ④讲述 ⑤复用 ⑥演化
-  </footer>
 </div>
 
 <script>
@@ -233,7 +228,7 @@ const sourceDeck=new URLSearchParams(location.search).get('deck');
 if(sourceDeck){window.courseLoading=true;window.coursePages=[];document.getElementById('cnt').textContent='正在读取课程…';(async()=>{let rows=[],meta;for(let offset=0;;offset+=60){const response=await fetch('/api/library?deck='+encodeURIComponent(sourceDeck)+'&limit=60&offset='+offset);if(!response.ok)throw Error('读取失败');const data=await response.json();meta=data.decks.find(d=>d.deck_id===sourceDeck);rows.push(...data.pages);window.coursePages=rows.map(p=>({atom_id:p.page_id,title:p.title,deck:meta?.title,page_number:p.page_number,hd:p.thumbnail_url||p.source_url,textcount:1,framework_labels:[],detail_url:'page.html?page='+encodeURIComponent(p.page_id)}));render();if(rows.length>=data.total)break;}window.topicAtoms=null;window.coursePages=rows.sort((a,b)=>a.page_number-b.page_number).map(p=>({atom_id:p.page_id,title:p.title,deck:meta?.title,page_number:p.page_number,hd:p.thumbnail_url||p.source_url,textcount:1,framework_labels:[],detail_url:'page.html?page='+encodeURIComponent(p.page_id)}));window.courseLoading=false;document.querySelector('h1').textContent=meta?.title||'课程';document.querySelector('.lead').textContent=(sourceDeck.startsWith('keynote-')?'Keynote 原始导入':'历史来源版本')+' · '+rows.length+' 页 · 按原始顺序浏览，标注待核验';render();})().catch(()=>{window.courseLoading=false;cnt.textContent='课程读取失败，请刷新重试';});}
 render();
 </script>
-</body>
+<script src="../title-tools.js?v=20261014"></script></body>
 </html>
 '''
 total = len(atoms)

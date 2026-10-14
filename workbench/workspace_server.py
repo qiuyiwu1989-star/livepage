@@ -111,8 +111,8 @@ def create_app(root=ROOT):
   upload=request.files.get('file')
   if not upload:raise ValueError('请选择 PDF')
   data=upload.read();sha=hashlib.sha256(data).hexdigest()
-  original=json.loads((root/'data/source-manifest.json').read_text())
-  if sha==original['source_sha256']:return jsonify(duplicate=True,deck_id=sha,pages=original['page_count'])
+  original=json.loads((root/'data/source-manifest.json').read_text()) if (root/'data/source-manifest.json').exists() else {}
+  if sha==original.get('source_sha256'):return jsonify(duplicate=True,deck_id=sha,pages=original['page_count'])
   try:doc=pymupdf.open(stream=data,filetype='pdf')
   except Exception:raise ValueError('文件不是有效 PDF')
   if doc.needs_pass or not 0<len(doc)<=500:raise ValueError('请提供未加密、1–500 页 PDF')
@@ -153,5 +153,7 @@ def create_app(root=ROOT):
  register_prep_agent(app, root)
  from governance_api import register_governance
  register_governance(app, root)
+ from workspace_tools import register_tools
+ register_tools(app,root)
  return app
 if __name__=='__main__':create_app().run(host='127.0.0.1',port=5198,debug=False)

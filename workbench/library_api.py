@@ -13,6 +13,9 @@ def register_library(app, root=None):
  archive_cache={}
  title_cache={}
  def title_overlay(atom_id):
+  from workspace_tools import title_override
+  override=title_override(root,atom_id)
+  if override:return {'knowledge_title':override['title'],'title_source':'user_edit','title_revision':override['revision']}
   path=root/'title-governance/audit.json'
   if not path.exists():return {}
   stamp=path.stat().st_mtime_ns
@@ -66,7 +69,7 @@ def register_library(app, root=None):
  def has_html(p):return p.get('html',{}).get('status') in {'local_exists','unverified_remote'}
  def view(p):
   p=copy.deepcopy(p)
-  p.update(title_overlay(p.get('atomic_id')))
+  p.update(title_overlay(p.get('atomic_id') or p.get('page_id')))
   if p.get('knowledge_title'):p['original_title']=p.get('title');p['title']=p['knowledge_title']
   p['original_source_url']=p.get('source_url')
   records,frameworks=originals() if p.get('atomic_id') else ({},{})
