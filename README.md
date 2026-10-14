@@ -42,3 +42,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 已加入 [workbench](workbench/README.md) 适配层：现有本地 API、组课界面、原图/HTML 内嵌阅读器及合成测试。它仍依赖私有目录快照和运行素材，不含真实课程，也尚未完成完整独立产品迁移或公网部署。
 
 HTML 管线改进见 [整改交接](docs/HTML-CONVERSION-HANDOFF.md)。转换工作由原始课件所在电脑执行，生成数量不代表已验收数量。
+
+## 跨平台 Agent 接手
+
+从 [项目上下文入口](docs/context/README.md) 开始，包含产品定位、OpenDesign/Echo 分工、已实现与未验收状态、实施优先级和接手提示。

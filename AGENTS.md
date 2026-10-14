@@ -10,3 +10,7 @@ This repository is the independent public codebase for 活页 LivePage.
 - Keep core content readable without disclosure controls; follow task-based navigation.
 - No production deployment is implied by a source commit.
 - Run PYTHONPATH=src python3 -m unittest discover -s tests for domain changes.
+
+## Project context
+
+Start with [docs/context/README.md](docs/context/README.md) for product decisions, module boundaries, implementation status and handoff steps. Reverify dated runtime claims before acting.
