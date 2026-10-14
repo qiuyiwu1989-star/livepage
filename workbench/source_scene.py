@@ -47,12 +47,31 @@ def extract_scene(pdf,page_index,decode=None):
             'human_review':'pending'}
 
 
+def preserve_text_regions(scene, pdf, indices, reason):
+    """Explicit source-raster fallback; retain decoded text and mark non-editable."""
+    doc=pymupdf.open(pdf)
+    try:
+        page=doc[scene['pdf_page']]
+        for i in indices:
+            block=scene['text'][i]
+            rect=pymupdf.Rect(block['bbox']) & page.rect
+            if rect.is_empty:raise ValueError('Empty text fallback region')
+            pix=page.get_pixmap(matrix=pymupdf.Matrix(2,2),clip=rect,alpha=True)
+            block['source_raster']={'png':base64.b64encode(pix.tobytes('png')).decode(),
+                'bbox':list(rect),'reason':reason,'editable':False,
+                'source_sha256':scene['source_sha256'],'review_status':'pending'}
+    finally:doc.close()
+    scene['limitations'].append('Some text regions retain source raster; not editable')
+
+
 def render_scene(scene,font_resolver):
     fonts={};groups={}
     for b in scene['text']:
+        if b.get('source_raster'):continue
         if any(0xe000<=ord(c)<=0xf8ff or 0xac00<=ord(c)<=0xd7ff or c=='\ufffd' for c in b['text']):
             raise ValueError('Suspect decoded text requires a source-linked correction')
-    for b in scene['text']:groups.setdefault(b['font'],[]).append(b['text'])
+    for b in scene['text']:
+        if not b.get('source_raster'):groups.setdefault(b['font'],[]).append(b['text'])
     css=[]
     for i,(name,parts) in enumerate(groups.items()):
         payload,baseline=font_payload(font_resolver(name),''.join(parts));fonts[name]=(f'f{i}',baseline)
@@ -60,6 +79,10 @@ def render_scene(scene,font_resolver):
     w,h=scene['size'];cq=lambda v:f'{v/w*100:.6f}cqw'
     blocks=[]
     for i,b in enumerate(scene['text']):
+        if b.get('source_raster'):
+            r=b['source_raster'];x0,y0,x1,y1=r['bbox']
+            blocks.append(f'<img data-block="{i}" data-editable="false" title="Source text region; editing pending" alt="{html.escape(b["text"],quote=True)}" style="position:absolute;left:{cq(x0)};top:{cq(y0)};width:{cq(x1-x0)};height:{cq(y1-y0)}" src="data:image/png;base64,{r["png"]}">')
+            continue
         family,baseline=fonts[b['font']];x,y=b['origin'];size=b['size']
         blocks.append(f'<span class="text" data-block="{i}" style="left:{cq(x)};top:{cq(y-baseline*size)};font-family:{family};font-size:{cq(size)};color:#{b["color"]:06x}">{html.escape(b["text"])}</span>')
     svg=scene['graphics_svg'];svg=re.sub(r'<(?:ns\d+:)?svg\b',lambda m:m[0]+' class="graphics"',svg,count=1)
