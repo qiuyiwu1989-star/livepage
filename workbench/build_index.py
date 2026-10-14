@@ -40,7 +40,7 @@ h1{font-family:var(--serif);font-size:clamp(1.8rem,4vw,2.6rem);font-weight:600;m
 .stat{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 18px;min-width:120px}
 .stat .n{font-family:var(--serif);font-style:italic;font-size:1.7rem;color:var(--accent);line-height:1}
 .stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-top:4px}
-.controls{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;margin:0 0 26px;align-items:center}
+.controls{display:grid;grid-template-columns:minmax(220px,2fr) repeat(3,minmax(130px,1fr)) auto;gap:12px;margin:0 0 26px;align-items:center}
 @media(max-width:820px){.controls{grid-template-columns:1fr}}
 .controls input,.controls select{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 15px;font-family:var(--sans);font-size:.95rem;background:var(--card);color:var(--ink)}
 .controls input:focus,.controls select:focus{outline:none;border-color:var(--accent)}
@@ -61,6 +61,7 @@ footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-fa
 .course-shortcuts{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 28px}.course-shortcuts a{display:flex;align-items:center;gap:10px;padding:10px 15px;background:var(--card);border:1px solid var(--line);border-radius:12px;text-decoration:none;color:var(--ink2);font-family:var(--sans);font-size:14px}.course-shortcuts a[aria-current=page]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}.course-shortcuts small{font-size:12px;color:var(--ink3)}.stats{display:none}
 .image-problem{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--paper);color:var(--ink3);font:13px var(--sans);padding:16px;text-align:center}.title-candidate{font:11px var(--sans);color:var(--ink3)}.aid:empty{display:none}
 .library-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.prep-entry{font:14px var(--sans);padding:12px 18px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--accent);white-space:nowrap}
+.processing-overview{margin:0 0 24px;padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:var(--card)}.processing-overview #processing-summary{display:flex;flex-wrap:wrap;gap:10px 20px;font:13px var(--sans);color:var(--ink2)}.processing-overview strong{font-weight:600;color:var(--accent)}.processing-overview details{margin-top:12px;font:12px var(--sans);color:var(--ink3)}.processing-overview details p{line-height:1.8;max-width:70em;margin-bottom:0}.course-shortcuts{gap:8px;margin-bottom:20px}.course-shortcuts a{padding:9px 12px;font-size:13px}.course-shortcuts small{font-size:11px}.controls{position:relative}.controls .count{font-variant-numeric:tabular-nums}@media(max-width:1050px){.controls{grid-template-columns:minmax(220px,2fr) 1fr 1fr}.controls .count{justify-self:end}}@media(max-width:700px){.wrap{padding:24px 16px 60px}.controls{grid-template-columns:1fr 1fr}.controls input{grid-column:1/-1}.processing-overview{padding:14px}.library-heading{align-items:flex-start}.prep-entry{padding:9px 12px;font-size:12px}}
 </style>
 </head>
 <body>
@@ -69,7 +70,7 @@ footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-fa
   <div class="library-heading"><h1>活页库</h1><a class="prep-entry" href="../assembly.html">备课工作区 →</a></div>
   <p class="lead">按熟悉的课程找内容，再把需要的页面加入备课。</p>
 
-  <nav class="course-shortcuts" aria-label="按课程浏览" id="courses">正在读取课程…</nav><p id="processing-summary" class="lead" role="status">正在核对处理进度…</p>
+  <nav class="course-shortcuts" aria-label="按课程浏览" id="courses">正在读取课程…</nav><section class="processing-overview" aria-label="处理进度"><div id="processing-summary" role="status">正在核对处理进度…</div><details><summary>查看任务登记与确认口径</summary><p id="processing-detail"></p></details></section>
   <div class="stats">
     <div class="stat"><div class="n">__TOTAL__</div><div class="l">原子页</div></div>
     <div class="stat"><div class="n">__FRAMES__</div><div class="l">框架覆盖</div></div>
@@ -219,7 +220,11 @@ fetch('/api/library/processing').then(r=>{if(!r.ok)throw Error('处理状态读�
  for(const c of d.courses){const a=document.createElement('a');a.href='index.html?deck='+encodeURIComponent(c.deck_id);a.textContent=c.title+' · '+({keynote:'Keynote',pdf:'PDF',legacy:'历史课件'}[c.source_kind])+' · '+c.page_count+' 页';if(c.deck_id===selected)a.setAttribute('aria-current','page');host.append(a);}
  const rows=selected?d.courses.filter(c=>c.deck_id===selected):d.courses;
  const n=(stage,state)=>rows.reduce((sum,c)=>sum+(c.counts[stage][state]||0),0);
- document.getElementById('processing-summary').textContent='标注：'+n('annotation','pending')+' 页待处理，'+n('annotation','candidate')+' 页候选待确认，'+n('annotation','confirmed')+' 页已确认。HTML：'+n('html','pending')+' 页无草稿，'+n('html','draft')+' 页待验收，'+n('html','confirmed')+' 页已确认。任务：'+n('task','unregistered')+' 页未登记，'+n('task','queued')+' 页排队，'+n('task','running')+' 页处理中，'+n('task','failed')+' 页失败，'+n('task','blocked')+' 页受阻，'+n('task','succeeded')+' 页任务已执行（仍需验收）。'+(!d.task_registry_available?' 尚无任务登记表，不能确认是否已进入外部处理管道。':'');
+ const summary=document.getElementById('processing-summary');summary.replaceChildren();
+ const stages=[['待标注',n('annotation','pending')],['标注待确认',n('annotation','candidate')],['HTML 待验收',n('html','draft')],['HTML 已确认',n('html','confirmed')]];
+ for(const [label,count] of stages){const item=document.createElement('span');const value=document.createElement('strong');value.textContent=count+' 页';item.append(value,document.createTextNode(' '+label));summary.append(item);}
+ document.getElementById('processing-detail').textContent='统计按课程出现页计算，同一知识页在多门课出现会分别计数。暂无 HTML 草稿 '+n('html','pending')+' 页；任务未登记 '+n('task','unregistered')+' 页，排队 '+n('task','queued')+' 页，处理中 '+n('task','running')+' 页，失败 '+n('task','failed')+' 页，受阻 '+n('task','blocked')+' 页，已执行 '+n('task','succeeded')+' 页。任务执行成功不代表人工验收通过。'+(!d.task_registry_available?' 当前缺少外部任务登记记录，无法据此判断是否已经进入处理管道。':'');
+
 }).catch(()=>{document.getElementById('courses').textContent='课程入口读取失败，请刷新重试。';document.getElementById('processing-summary').textContent='处理进度暂不可核验';});
 
 if(topic&&!new URLSearchParams(location.search).has('deck')){fetch('deck-context.json').then(r=>r.json()).then(rows=>{const selected=rows.filter(r=>r.deck===topic);window.topicAtoms=new Set(selected.map(r=>r.atom_id));const byId=new Map(DATA.map(a=>[a.atom_id,a]));window.coursePages=selected.sort((a,b)=>Number(a.page)-Number(b.page)).filter(row=>byId.has(row.atom_id)).map(row=>({...byId.get(row.atom_id),occurrence_id:row.id,page_number:row.page,deck:row.deck_name,hd:'../assets/legacy-thumbs/'+row.id+'.jpg'})).map(applyTitle);const h=document.querySelector('h1');if(h)h.textContent=selected[0]?.deck_name||'主题总览';render();}).catch(()=>{cnt.textContent='主题读取失败，请刷新重试';});}
