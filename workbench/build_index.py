@@ -31,7 +31,7 @@ PAGE = r'''<!doctype html>
 <title>活页库 · 活页 LivePage</title>
 <link rel="stylesheet" href="../assets/editor-fonts.css"><style>
 :root{--paper:#faf8f3;--ink:#221e1a;--ink2:#57524a;--ink3:#8a8377;--line:#e0d9cb;--card:#fffefb;--accent:#8e4231;--accent-soft:#f4e7e2;--green:#2f6b4f;--green-soft:#e7f0ea;--serif:"QiuSerif","Noto Serif SC","Songti SC",Georgia,serif;--sans:"QiuSans","Noto Sans SC",-apple-system,"PingFang SC",sans-serif;--mono:"JetBrains Mono",Menlo,monospace}
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.7}
+[hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.7}
 .wrap{max-width:1320px;margin:0 auto;padding:40px 32px 90px}
 .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
 h1{font-family:var(--serif);font-size:clamp(1.8rem,4vw,2.6rem);font-weight:600;margin:0 0 10px;line-height:1.25}
