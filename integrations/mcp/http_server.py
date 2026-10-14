@@ -21,7 +21,12 @@ class ClientAuth:
         except (OSError,ValueError):return None
         for client in records:
             if hmac.compare_digest(digest,client.get('token_sha256','')) and not client.get('revoked') and client.get('expires_at',0)>time.time():
-                return Bridge(self.api,client.get('allowed_decks',[]),client.get('asset_download') is True)
+                grants=client.get('grants')
+                if grants is None:
+                    grant={'actions':['read']+(['download'] if client.get('asset_download') else []),'collections':client.get('allowed_decks',[])}
+                else:grant=grants.get('livepage',{})
+                if 'read' not in grant.get('actions',[]) or not grant.get('collections'):return None
+                return Bridge(self.api,grant['collections'],'download' in grant.get('actions',[]))
         return None
     async def __call__(self,scope,receive,send):
         if scope['type']!='http':return await self.app(scope,receive,send)
@@ -35,7 +40,14 @@ class ClientAuth:
         try:await self.app(scope,receive,send)
         finally:current.reset(token)
 
-service=create_server(ScopedBridge(),stateless_http=True,json_response=True,
+service=create_server(ScopedBridge(),server_name='MCP Center',stateless_http=True,json_response=True,
     transport_security=__import__('mcp.server.transport_security',fromlist=['TransportSecuritySettings']).TransportSecuritySettings(
         enable_dns_rebinding_protection=True,allowed_hosts=['127.0.0.1','localhost','127.0.0.1:*','localhost:*','qiuyiwu.com'],allowed_origins=['https://qiuyiwu.com']))
+@service.tool(name='center_list_applications')
+def list_applications() -> dict:
+    """Discover applications and operations allowed to this key. Registration alone never grants access."""
+    bridge=current.get()
+    return {'applications':[{'id':'livepage','name':'活页 LivePage','tool_prefix':'livepage_',
+                             'actions':['read']+(['download'] if bridge.asset_download else [])}],
+            'gateway_url':'https://qiuyiwu.com/mcp','other_applications':'not yet integrated'}
 app=ClientAuth(service.streamable_http_app(),os.environ.get('LIVEPAGE_MCP_CLIENTS','/etc/livepage-mcp/clients.json'),API(os.environ.get('LIVEPAGE_API_BASE','http://127.0.0.1:5298')))

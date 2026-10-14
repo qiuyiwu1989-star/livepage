@@ -10,6 +10,8 @@ class HTTPAuthTest(unittest.TestCase):
    self.assertIsNone(auth.resolve(''));self.assertIsNone(auth.resolve('Bearer invalid'))
    b=auth.resolve('Bearer test-only-key');self.assertEqual(len(b.list_collections()),1)
    with self.assertRaises(ValueError):b.read_content('secret')
+   record['grants']={'other-app':{'actions':['read'],'collections':['allowed']}};path.write_text(json.dumps({'clients':[record]}));self.assertIsNone(auth.resolve('Bearer test-only-key'))
+   record['grants']={'livepage':{'actions':['read'],'collections':['allowed']}};record['asset_download']=True;path.write_text(json.dumps({'clients':[record]}));self.assertFalse(auth.resolve('Bearer test-only-key').asset_download)
    record['expires_at']=0;path.write_text(json.dumps({'clients':[record]}));self.assertIsNone(auth.resolve('Bearer test-only-key'))
    record['expires_at']=time.time()+60;record['revoked']=True;path.write_text(json.dumps({'clients':[record]}));self.assertIsNone(auth.resolve('Bearer test-only-key'))
 if __name__=='__main__':unittest.main()

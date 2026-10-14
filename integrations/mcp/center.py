@@ -21,7 +21,7 @@ def create_app(root=None,api=None):
   temp=path.with_name(path.name+'.'+uuid.uuid4().hex+'.tmp');temp.write_text(json.dumps(data,ensure_ascii=False));temp.chmod(0o600);temp.replace(path)
  def services():return read(services_file,{'services':[{'id':'livepage','name':'活页 LivePage','url':'https://qiuyiwu.com/mcp/livepage','description':'知识、课程与图片 / HTML 素材，只读接口','key_management':True}]})['services']
  def registry(sid):
-  if sid!='livepage':raise ValueError('此服务尚未接入中心密钥验证；只支持目录登记')
+  if sid not in ('all','livepage'):raise ValueError('此服务尚未接入中心密钥验证；只支持目录登记')
   return root/'clients.json'
  @app.before_request
  def protect():
@@ -44,7 +44,7 @@ def create_app(root=None,api=None):
  def session():
   token=secrets.token_urlsafe(32);r=jsonify(csrf=token);r.set_cookie('mcp_center_csrf',token,secure=True,httponly=True,samesite='Strict',path='/admin/mcp/');return r
  @app.get('/api/services')
- def list_services():return jsonify(services=services())
+ def list_services():return jsonify(services=[dict(s, integration='active' if s.get('key_management') else 'directory_only', permissions=['read','download'] if s.get('key_management') else []) for s in services()],gateway_url='https://qiuyiwu.com/mcp')
  @app.post('/api/services')
  def add_service():
   b=request.get_json(silent=True) or {};name=b.get('name','');url=b.get('url','');description=b.get('description','')
@@ -63,24 +63,28 @@ def create_app(root=None,api=None):
   return jsonify(collections=[{'id':d['deck_id'],'name':d.get('title','课件'),'pages':d.get('page_count',0)} for d in rows])
  @app.get('/api/keys')
  def list_keys():
-  sid=request.args.get('service','livepage');path=registry(sid);rows=read(path,{'clients':[]})['clients']
-  return jsonify(keys=[{k:c.get(k) for k in ['client_id','name','suffix','allowed_decks','asset_download','created_at','expires_at','revoked']} for c in rows])
+  sid=request.args.get('service','all');path=registry(sid);rows=read(path,{'clients':[]})['clients']
+  rows=[dict(c,grants=c.get('grants',{'livepage':{'actions':['read']+(['download'] if c.get('asset_download') else []),'collections':c.get('allowed_decks',[])}})) for c in rows]
+  if sid!='all':rows=[c for c in rows if sid in c['grants']]
+  return jsonify(keys=[{k:c.get(k) for k in ['client_id','name','suffix','allowed_decks','asset_download','created_at','expires_at','revoked','grants']} for c in rows])
  @app.post('/api/keys')
  def create_key():
-  b=request.get_json(silent=True) or {};path=registry(b.get('service','livepage'));name=b.get('name');decks=b.get('allowed_decks');days=b.get('days',30);download=b.get('asset_download',False)
+  b=request.get_json(silent=True) or {};sid=b.get('service','livepage');path=registry(sid);
+  if sid=='all':raise ValueError('请选择已接入的应用，不能默认授权全站')
+  name=b.get('name');decks=b.get('allowed_decks');days=b.get('days',30);download=b.get('asset_download',False)
   if not isinstance(name,str) or not 1<=len(name.strip())<=80:raise ValueError('备注请填写1–80字')
   if type(days) is not int or not 1<=days<=90 or type(download) is not bool:raise ValueError('有效期或下载权限无效')
   if not isinstance(decks,list) or not 1<=len(decks)<=20 or any(not isinstance(x,str) for x in decks):raise ValueError('请选择1–20份课程')
   known={c['deck_id'] for c in api.get('/api/prep/courses').get('courses',[])}
   if not set(decks)<=known:raise ValueError('课程已变化，请刷新后重选')
-  key='lp_'+secrets.token_urlsafe(40);now=int(time.time());row={'client_id':uuid.uuid4().hex,'name':name.strip(),'suffix':key[-6:],'token_sha256':hashlib.sha256(key.encode()).hexdigest(),'allowed_decks':list(dict.fromkeys(decks)),'asset_download':download,'created_at':now,'expires_at':now+days*86400,'revoked':False}
+  key='mcp_'+secrets.token_urlsafe(40);now=int(time.time());row={'client_id':uuid.uuid4().hex,'name':name.strip(),'suffix':key[-6:],'token_sha256':hashlib.sha256(key.encode()).hexdigest(),'allowed_decks':list(dict.fromkeys(decks)),'asset_download':download,'created_at':now,'expires_at':now+days*86400,'revoked':False,'grants':{sid:{'actions':['read']+(['download'] if download else []),'collections':list(dict.fromkeys(decks))}}}
   with lock():
    data=read(path,{'clients':[]});data['clients'].append(row);write(path,data)
   return jsonify(key=key,client_id=row['client_id'],expires_at=row['expires_at']),201
  @app.post('/api/keys/<client_id>/revoke')
  def revoke(client_id):
   with lock():
-   path=registry((request.get_json(silent=True) or {}).get('service','livepage'));data=read(path,{'clients':[]});row=next((c for c in data['clients'] if c['client_id']==client_id),None)
+   path=registry('all');data=read(path,{'clients':[]});row=next((c for c in data['clients'] if c['client_id']==client_id),None)
    if row is None:return jsonify(error='密钥不存在'),404
    row['revoked']=True;row['revoked_at']=int(time.time());write(path,data)
   return jsonify(ok=True)
