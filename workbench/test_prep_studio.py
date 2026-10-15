@@ -92,6 +92,20 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(old['revision'],1);self.assertEqual(self.latest()['revision'],revision)
         h=self.client.get('/api/prep/studio/'+self.pid+'/history').json['history'];self.assertEqual(h[-1]['revision'],1)
 
+    def test_new_manuscript_invalidates_previous_assembly(self):
+        self.app.config['PREP_CONTEXT_PROVIDER']=lambda i:dict(sources=[dict(source_id='book:synthetic#1',kind='book',text='Synthetic',title='Book'),dict(source_id='page:p1',kind='slide',page_id='p1',text='Synthetic slide',title='Slide')],books=[],coverage=[])
+        original=self.result
+        def with_page(c):
+            r=original(c)
+            if 'confirmed_text' in c and 'outline' not in c:r['sections'][0]['page_ids']=['p1']
+            return r
+        self.app.config['PREP_AGENT_PROVIDER']=with_page
+        self.app.extensions['assembly_create']=lambda data:dict(assembly_id='assembly-'+'b'*32)
+        self.generate('understanding');self.confirm();self.generate('outline');self.generate('manuscript')
+        d=self.latest();r=self.client.post('/api/prep/studio/'+self.pid+'/assemble',json={'base_revision':d['revision']})
+        self.assertEqual(r.status_code,201);self.assertIn('assembly_id',self.latest())
+        self.generate('manuscript');d=self.latest();self.assertNotIn('assembly_id',d);self.assertNotIn('assembly_review',d)
+
     def test_book_catalog_and_section_status(self):
         self.app.config.pop('PREP_CONTEXT_PROVIDER')
         index=self.root/'books.json';index.write_text(json.dumps({'books':[{'slug':'synthetic','name':'Synthetic','status':'online','sections':[{'sid':'book:synthetic#1','text':'education growth','chapter':'Test'}]}]}))

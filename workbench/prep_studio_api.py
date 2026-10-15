@@ -147,7 +147,7 @@ def register_prep_studio(app, root):
         with LOCK:
             doc=current(pid);cas(doc,data)
             if (doc.get('job') or {}).get('status')=='running':raise ValueError('任务执行中，请完成后修改')
-            for key in ('understanding','outline','manuscript','assembly_id','rejected_candidate'):doc.pop(key,None)
+            for key in ('understanding','outline','manuscript','assembly_id','assembly_review','rejected_candidate'):doc.pop(key,None)
             doc.update(intent=intent,title=intent['topic'][:160],confirmed=False,confirmed_text='',context={},job=None,revision=doc['revision']+1,updated_at=now());save(doc)
         return jsonify(doc)
 
@@ -182,7 +182,7 @@ def register_prep_studio(app, root):
             doc['confirmed_text']=value.strip();doc['confirmed']=data.get('confirm') is True
             doc['confirmation_actor']='agent_test' if data.get('confirmation_actor')=='agent_test' else 'user'
             doc['human_corrections'].append(dict(text=value.strip(),confirmed=doc['confirmed'],at=now()))
-            doc.pop('outline',None);doc.pop('manuscript',None);doc.pop('assembly_id',None)
+            doc.pop('outline',None);doc.pop('manuscript',None);doc.pop('assembly_id',None);doc.pop('assembly_review',None)
             doc.update(revision=doc['revision']+1,updated_at=now());save(doc)
         return jsonify(doc)
 
@@ -210,7 +210,8 @@ def register_prep_studio(app, root):
                 if latest['revision']!=revision:return
                 latest['context']=context;latest[stage]=result;latest.pop('rejected_candidate',None)
                 if stage=='understanding':latest.update(confirmed=False,confirmed_text='');latest.pop('outline',None);latest.pop('manuscript',None)
-                if stage=='outline':latest.pop('manuscript',None);latest.pop('assembly_id',None)
+                if stage=='outline':latest.pop('manuscript',None)
+                if stage in ('outline','manuscript'):latest.pop('assembly_id',None);latest.pop('assembly_review',None)
                 latest.update(revision=revision+1,updated_at=now(),job=dict(status='succeeded',stage=stage,model=model,completed_at=now()),review_status='pending')
                 save(latest)
         except Exception as e:
@@ -254,7 +255,7 @@ def register_prep_studio(app, root):
             outline=data.get('outline')
             validate(outline,doc['context']['sources'],'outline',doc)
             doc['outline']=outline;doc['outline_review']='edited_pending'
-            doc.pop('manuscript',None);doc.pop('assembly_id',None)
+            doc.pop('manuscript',None);doc.pop('assembly_id',None);doc.pop('assembly_review',None)
             doc.update(revision=doc['revision']+1,updated_at=now());save(doc)
         return jsonify(doc)
 
@@ -268,7 +269,7 @@ def register_prep_studio(app, root):
             m=data.get('manuscript')
             if len(json.dumps(m,ensure_ascii=False))>150000:raise ValueError('讲稿过长')
             validate(m,doc['context']['sources'],'manuscript',doc)
-            doc['manuscript']=m;doc['manuscript_review']='human_edited_pending';doc.pop('assembly_id',None)
+            doc['manuscript']=m;doc['manuscript_review']='human_edited_pending';doc.pop('assembly_id',None);doc.pop('assembly_review',None)
             doc.update(revision=doc['revision']+1,updated_at=now());save(doc)
         return jsonify(doc)
 
@@ -280,17 +281,11 @@ def register_prep_studio(app, root):
             if not doc.get('confirmed') or not doc.get('outline'):
                 raise ValueError('请先确认理解并完成讲述结构')
             if (doc.get('job') or {}).get('status')=='running':raise ValueError('任务仍在执行')
-            if doc.get('assembly_id'):return jsonify(assembly_id=doc['assembly_id'],preparation=doc)
-            items=[]
-            for n,section in enumerate(doc['outline']['sections']):
-                manuscript=(doc.get('manuscript') or {}).get('sections',[])
-                script=manuscript[n].get('script','') if n<len(manuscript) else ''
-                notes='【AI草稿，待讲者核对】本段'+str(section['minutes'])+'分钟（含互动）。\n'+section.get('purpose','')+'\n过渡：'+section.get('transition','')+'\n'+script+'\n来源：'+', '.join(section.get('source_ids',[]))
-                for page_id in section.get('page_ids',[]):
-                    items.append(dict(page_id=page_id,chapter=section['title'],notes=notes[:20000]))
-            if not items:raise ValueError('当前结构没有选用活页；可先按讲稿试讲，再手工补页。')
+            if doc.get('assembly_id') and not data.get('rebuild'):return jsonify(assembly_id=doc['assembly_id'],preparation=doc)
+            from prep_assembly import assembly_plan
+            items,review=assembly_plan(doc,deduplicate=data.get('deduplicate',True) is not False)
             assembly=app.extensions['assembly_create'](dict(title=doc['outline'].get('title',doc['title'])[:200],course_title='备课台派生 · AI草稿',entries=items))
-            doc.update(assembly_id=assembly['assembly_id'],revision=doc['revision']+1,updated_at=now());save(doc)
+            doc.update(assembly_id=assembly['assembly_id'],assembly_review=review,revision=doc['revision']+1,updated_at=now());save(doc)
         return jsonify(assembly_id=assembly['assembly_id'],preparation=doc),201
 
     @bp.get('/api/prep/studio/<pid>/export')

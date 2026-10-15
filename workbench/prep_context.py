@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import uuid
 from urllib.request import Request, urlopen
 
 
@@ -19,6 +20,15 @@ def env_config(app, name):
                 if key.strip() == name:
                     return val.strip().strip('\"\'')
     return None
+
+
+def atomic_json(path, data):
+    temporary=path.parent/('.'+uuid.uuid4().hex+'.tmp')
+    try:
+        temporary.write_text(json.dumps(data,ensure_ascii=False))
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def terms(text):
@@ -73,7 +83,7 @@ def collect(app, root, intent):
             if counts.get(slug, 0) >= 2:
                 continue
             counts[slug] = counts.get(slug, 0) + 1
-            sources.append(source(sec.get('sid') or 'book:'+slug+'#'+str(sec['n']), 'book', book.get('name', ''), sec.get('text', '')[:7000], chapter=sec.get('chapter'), heading=sec.get('heading'), url=sec.get('url'), author_status='authored_source_not_reverified', publication_status=book.get('status')))
+            sources.append(source(sec.get('sid') or 'book:'+slug+'#'+str(sec['n']), 'book', book.get('name', ''), sec.get('text', '')[:7000], excerpt_original_length=len(sec.get('text','')), excerpt_truncated=len(sec.get('text',''))>7000, chapter=sec.get('chapter'), heading=sec.get('heading'), url=sec.get('url'), author_status='authored_source_not_reverified', publication_status=book.get('status')))
             if sum(counts.values()) >= 10:
                 break
         coverage.append(dict(kind='books', status='ready', total_books=len(index.get('books', [])), matched_sections=sum(counts.values())))
@@ -92,7 +102,8 @@ def collect(app, root, intent):
         cache.mkdir(parents=True, exist_ok=True)
         listing = cache/'transcript-list.json'
         import time
-        if listing.exists() and time.time()-listing.stat().st_mtime < 1800:
+        metadata_cached=listing.exists() and time.time()-listing.stat().st_mtime < 1800
+        if metadata_cached:
             items = json.loads(listing.read_text())
         else:
             items, offset = [], 0
@@ -104,8 +115,7 @@ def collect(app, root, intent):
                 if next_offset is None or not batch or next_offset <= offset:
                     break
                 offset = next_offset
-            temporary = listing.with_suffix('.tmp')
-            temporary.write_text(json.dumps(items, ensure_ascii=False)); temporary.replace(listing)
+            atomic_json(listing,items)
         selected = []
         selected_ids = set()
         # Cover each question before adding more results for a single broad topic.
@@ -129,7 +139,7 @@ def collect(app, root, intent):
             data = json.loads(filename.read_text()) if filename.exists() else None
             if not data or data.get('updated_at') != item.get('updated_at'):
                 data = remote('?id='+tid+'&include_analyses=true')
-                filename.write_text(json.dumps(data, ensure_ascii=False))
+                atomic_json(filename,data)
             raw = data.get('text','')
             blocks = []
             for m in re.finditer(r'[^\n]+(?:\n(?!\s*\n)[^\n]*)*', raw):
@@ -148,9 +158,9 @@ def collect(app, root, intent):
                 first = body.split('\n',1)[0]
                 attributed = bool(re.match(r'^(邱懿武|qiuyiwu)\s', first))
                 stamp = re.search(r'\b\d{1,2}:\d{2}(?::\d{2})?\b', first)
-                sources.append(source('talk:'+tid+'@'+str(start), 'transcript', data.get('title',''), body[:4500], transcript_id=tid, character_offset=start, time_anchor=stamp.group() if stamp else None, speaker=first[:100], attribution='speaker_label_qiuyiwu_unverified_audio' if attributed else 'other_or_unknown_speaker', source_updated_at=data.get('updated_at'), url='https://shennao.zaowuyun.com/api/v1/transcripts?id='+tid, note='转写未听校；历史分析未作为本人原话。'))
+                sources.append(source('talk:'+tid+'@'+str(start), 'transcript', data.get('title',''), body[:4500], excerpt_original_length=len(body), excerpt_truncated=len(body)>4500, transcript_id=tid, character_offset=start, time_anchor=stamp.group() if stamp else None, speaker=first[:100], attribution='speaker_label_qiuyiwu_unverified_audio' if attributed else 'other_or_unknown_speaker', source_updated_at=data.get('updated_at'), url='https://shennao.zaowuyun.com/api/v1/transcripts?id='+tid, note='转写未听校；历史分析未作为本人原话。'))
             read_count += 1
-        coverage.append(dict(kind='shennao', status='ready', indexed_records=len(items), read_records=read_count, note='按标题关键词检索后读取原文片段，不是全库语义理解。'))
+        coverage.append(dict(kind='shennao', status='ready', indexed_records=len(items), read_records=read_count, metadata_cached=metadata_cached, metadata_checked_at=listing.stat().st_mtime, note=('使用最近核对过的目录缓存；' if metadata_cached else '本次已联网核对目录；')+'按标题关键词检索后读取原文片段，不是全库语义理解。'))
     except Exception:
         coverage.append(dict(kind='shennao', status='unavailable', message='深脑暂不可读；未将缓存冒充本次成功读取。'))
 
