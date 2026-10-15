@@ -36,21 +36,24 @@ def register_prep_agent(app, root):
     def available():
         return callable(app.config.get('PREP_AGENT_PROVIDER')) or all(config().values())
 
-    def generate(context):
+    def generate(context, system=SYSTEM, max_tokens=8000):
         provider = app.config.get('PREP_AGENT_PROVIDER')
         if callable(provider):
             return provider(context), app.config.get('PREP_AGENT_MODEL', 'configured-provider')
         cfg = config()
         # Explicit configuration only: no credential file discovery or implicit model fallback.
-        body = {'model': cfg['MODEL'], 'messages': [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': json.dumps(context, ensure_ascii=False)}], 'max_tokens': 8000, 'response_format': {'type':'json_object'}}
+        body = {'model': cfg['MODEL'], 'messages': [{'role': 'system', 'content': system}, {'role': 'user', 'content': json.dumps(context, ensure_ascii=False)}], 'max_tokens': max_tokens, 'response_format': {'type':'json_object'}}
         if 'volces.com' in cfg['BASE_URL']:
             body['thinking']={'type':'disabled'}
         req = Request(cfg['BASE_URL'].rstrip('/') + '/chat/completions', data=json.dumps(body).encode(), headers={'Authorization': 'Bearer ' + cfg['API_KEY'], 'Content-Type': 'application/json'})
-        with urlopen(req, timeout=90) as response:
+        with urlopen(req, timeout=180 if max_tokens>8000 else 90) as response:
             result = json.load(response)
         content = result['choices'][0]['message']['content']
         content = re.sub(r'^```(?:json)?\s*|\s*```$', '', content.strip())
         return json.loads(content), cfg['MODEL']
+
+    app.extensions['prep_model_generate'] = generate
+    app.extensions['prep_model_available'] = available
 
     @bp.get('/api/prep/agent/status')
     def status():

@@ -151,6 +151,8 @@ def create_app(root=ROOT):
  register_prep_courses(app, root)
  from prep_agent_api import register_prep_agent
  register_prep_agent(app, root)
+ from prep_studio_api import register_prep_studio
+ register_prep_studio(app, root)
  from governance_api import register_governance
  register_governance(app, root)
  from workspace_tools import register_tools

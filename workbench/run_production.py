@@ -21,4 +21,4 @@ def scope_response(response):
  return response
 @app.before_request
 def private_paths():
- if request.path.endswith(('.env','.pem','.key','.py')) or request.path.startswith(('/data/assemblies/','/data/prep-proposals/','/workspace/')):return '',404
+ if request.path.endswith(('.env','.pem','.key','.py')) or request.path.startswith(('/data/assemblies/','/data/prep-proposals/','/data/preparations/','/data/prep-context-cache/','/workspace/')):return '',404

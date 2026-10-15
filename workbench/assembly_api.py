@@ -110,6 +110,8 @@ def register_assemblies(app, root):
         old = {e['entry_id']: e for e in previous}
         seen = set()
         result = []
+        fresh_ids = [item['page_id'] for item in body['entries'] if not item.get('entry_id')]
+        fresh = iter(entries(fresh_ids) if fresh_ids else [])
         for item in body['entries']:
             if set(item) - {'entry_id', 'page_id', 'chapter', 'notes'}:
                 raise ValueError('页面引用包含未知字段')
@@ -120,7 +122,7 @@ def register_assemblies(app, root):
                 entry = deepcopy(old[eid])
                 seen.add(eid)
             else:
-                entry = entries([item['page_id']])[0]
+                entry = next(fresh)
             for key, limit in (('chapter', 200), ('notes', 20000)):
                 value = item.get(key, entry.get(key, ''))
                 if not isinstance(value, str) or len(value) > limit:
@@ -166,15 +168,19 @@ def register_assemblies(app, root):
             docs = [summary(current(p.name)) for p in storage.glob('assembly-*') if p.is_dir() and _ID.fullmatch(p.name) and revisions(p.name)]
         return jsonify(assemblies=sorted(docs, key=lambda x: x['updated_at'], reverse=True))
 
-    @bp.post('/api/assemblies')
-    def create():
-        body = payload()
+    def create_document(body):
         title, course, ids = fields(body)
         with _LOCK:
             now = stamp()
             doc = save(dict(assembly_id='assembly-' + uuid.uuid4().hex, title=title, course_title=course,
                             revision=1, entries=edited_entries(body), created_at=now, updated_at=now))
-        return jsonify(doc), 201
+        return doc
+
+    app.extensions['assembly_create'] = create_document
+
+    @bp.post('/api/assemblies')
+    def create():
+        return jsonify(create_document(payload())), 201
 
     @bp.get('/api/assemblies/<aid>')
     def detail(aid):
